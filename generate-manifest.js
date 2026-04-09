@@ -12,10 +12,14 @@ const categories = [
   'waza3',
   'waza4',
   'waza5',
+  'waza_sp',
   'goods',
+  'goods_ace',
   'support',
   'tool',
-  'stadium'
+  'tool_ace',
+  'stadium',
+  'stadium_ace'
 ];
 
 const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];

@@ -16,6 +16,9 @@
       --card-ratio: 63 / 88;
       --gap: 12px;
       --radius: 16px;
+      --rare-gold: #facc15;
+      --rare-orange: #fb923c;
+      --rare-purple: #a855f7;
     }
 
     * {
@@ -52,7 +55,11 @@
       gap: var(--gap);
       width: 100%;
       min-height: 100svh;
-      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      padding:
+        max(12px, env(safe-area-inset-top))
+        max(12px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom))
+        max(12px, env(safe-area-inset-left));
     }
 
     .panel {
@@ -223,6 +230,44 @@
       position: relative;
     }
 
+    .overlay-card.is-rare {
+      border-color: rgba(250, 204, 21, 0.95);
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.12),
+        0 0 18px rgba(250, 204, 21, 0.45),
+        0 0 36px rgba(168, 85, 247, 0.28),
+        0 18px 36px rgba(0, 0, 0, 0.4);
+      background:
+        radial-gradient(circle at top, rgba(250, 204, 21, 0.18), transparent 42%),
+        linear-gradient(180deg, #111827 0%, #1f2937 100%);
+    }
+
+    .overlay-card.is-rare::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(
+          120deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.00) 35%,
+          rgba(255, 255, 255, 0.35) 50%,
+          rgba(255, 255, 255, 0.00) 65%,
+          transparent 100%
+        );
+      transform: translateX(-140%);
+      animation: rareShine 1.2s ease-out infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .overlay-image,
+    .rare-flash-wrap,
+    .overlay-loading {
+      position: relative;
+      z-index: 2;
+    }
+
     .overlay-loading {
       font-weight: 800;
       font-size: 1.1rem;
@@ -264,6 +309,54 @@
       padding: 6px 12px;
       font-size: 0.8rem;
       color: var(--muted);
+    }
+
+    .rare-flash-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rare-flash-badge {
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      color: #1f2937;
+      background: linear-gradient(135deg, #fde68a, #facc15);
+      box-shadow: 0 0 12px rgba(250, 204, 21, 0.45);
+    }
+
+    .rare-flash-text {
+      font-size: clamp(1.7rem, 6vw, 3.2rem);
+      font-weight: 900;
+      color: #fff;
+      text-align: center;
+      letter-spacing: 0.08em;
+      text-shadow:
+        0 0 8px rgba(255,255,255,0.9),
+        0 0 18px rgba(250,204,21,0.95),
+        0 0 34px rgba(251,146,60,0.75),
+        0 0 48px rgba(168,85,247,0.7);
+    }
+
+    .rare-flash-sub {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fef3c7;
+      text-align: center;
+      letter-spacing: 0.06em;
+    }
+
+    @keyframes rareShine {
+      0% {
+        transform: translateX(-140%);
+      }
+      100% {
+        transform: translateX(140%);
+      }
     }
 
     @media (max-width: 760px) {
@@ -374,9 +467,10 @@
         <button class="action-btn" data-action="waza2">2</button>
         <button class="action-btn" data-action="waza3">3</button>
       </div>
-      <div class="row row-2">
+      <div class="row row-3">
         <button class="action-btn" data-action="waza4">4</button>
         <button class="action-btn" data-action="waza5">5</button>
+        <button class="action-btn" data-action="waza_sp">SP</button>
       </div>
 
       <h2>その他</h2>
@@ -411,6 +505,7 @@
 
   <script>
     const decisionSound = new Audio('./sounds/decision.mp3');
+    const RARE_RATE = 0.10;
 
     const State = {
       IDLE: 'idle',
@@ -425,6 +520,7 @@
       currentResult: null,
       pendingTarget: null,
       imagePool: {},
+      isRareHit: false,
     };
 
     const CATEGORY_META = {
@@ -433,10 +529,34 @@
       waza3: { label: 'ワザ3', type: 'overlayOnly' },
       waza4: { label: 'ワザ4', type: 'overlayOnly' },
       waza5: { label: 'ワザ5', type: 'overlayOnly' },
-      goods: { label: 'グッズ', type: 'overlayOnly' },
+      waza_sp: {
+        label: 'Vstarパワー',
+        type: 'overlayOnly',
+        forceRare: true
+      },
+
+      goods: {
+        label: 'グッズ',
+        type: 'overlayOnly',
+        rareEnabled: true,
+        rareCategory: 'goods_ace',
+      },
+
       support: { label: 'サポート', type: 'overlayOnly' },
-      tool: { label: 'どうぐ', type: 'toolSlot' },
-      stadium: { label: 'スタジアム', type: 'stadiumSlot' },
+
+      tool: {
+        label: 'どうぐ',
+        type: 'toolSlot',
+        rareEnabled: true,
+        rareCategory: 'tool_ace',
+      },
+
+      stadium: {
+        label: 'スタジアム',
+        type: 'stadiumSlot',
+        rareEnabled: true,
+        rareCategory: 'stadium_ace',
+      },
     };
 
     const els = {
@@ -482,6 +602,20 @@
       return images[index];
     }
 
+    function rollRare(config) {
+
+      if (config?.forceRare) return true;
+
+      if (!config?.rareEnabled) return false;
+
+      const rareImages = appState.imagePool[config.rareCategory] || [];
+      if (rareImages.length === 0) {
+        return false;
+      }
+
+      return Math.random() < RARE_RATE;
+    }
+
     function renderPlaceholder(element, label) {
       element.innerHTML = '';
       const card = document.createElement('div');
@@ -497,6 +631,10 @@
       img.alt = altText;
       img.className = 'card-image';
       element.appendChild(img);
+    }
+
+    function setOverlayRareMode(isRare) {
+      els.overlayCard.classList.toggle('is-rare', isRare);
     }
 
     function renderOverlayImage(imagePath, altText) {
@@ -516,12 +654,67 @@
       els.overlayCard.appendChild(loading);
     }
 
+    function renderRareIntro(text = 'ACE CHANCE!') {
+      els.overlayCard.innerHTML = '';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'rare-flash-wrap';
+
+      const badge = document.createElement('div');
+      badge.className = 'rare-flash-badge';
+      badge.textContent = 'RARE HIT';
+
+      const title = document.createElement('div');
+      title.className = 'rare-flash-text';
+      title.textContent = text;
+
+      const sub = document.createElement('div');
+      sub.className = 'rare-flash-sub';
+      sub.textContent = '特別効果発動！';
+
+      wrap.appendChild(badge);
+      wrap.appendChild(title);
+      wrap.appendChild(sub);
+      els.overlayCard.appendChild(wrap);
+    }
+
+    function startRareIntro(onComplete, text) {
+      setOverlayRareMode(true);
+      renderRareIntro(text);
+      els.overlayMeta.textContent = '特別演出！';
+
+      els.overlayCard.animate(
+        [
+          { transform: 'scale(0.90)', opacity: 0.35 },
+          { transform: 'scale(1.08)', opacity: 1 },
+          { transform: 'scale(1.00)', opacity: 1 }
+        ],
+        {
+          duration: 1200,
+          easing: 'ease-out'
+        }
+      );
+
+      window.setTimeout(() => {
+        onComplete();
+      }, 1600);
+    }
+
     function openOverlay(actionKey) {
       const config = CATEGORY_META[actionKey];
       if (!config || appState.status !== State.IDLE) return;
 
-      const images = appState.imagePool[actionKey] || [];
-      if (images.length === 0) {
+      const normalImages = appState.imagePool[actionKey] || [];
+      
+      const rareText = config.forceRare ? 'Vstarパワー' : 'ACE CHANCE!';
+
+      const rareImages = config.forceRare
+        ? (appState.imagePool[actionKey] || [])
+        : config.rareCategory
+          ? (appState.imagePool[config.rareCategory] || [])
+          : [];
+
+      if (normalImages.length === 0 && rareImages.length === 0) {
         window.alert(`${config.label} の画像がありません。manifest.json を確認してください。`);
         return;
       }
@@ -529,14 +722,36 @@
       appState.currentAction = actionKey;
       appState.pendingTarget = config.type;
       appState.currentResult = null;
+      appState.isRareHit = false;
 
       els.overlay.classList.add('is-open');
       els.overlay.setAttribute('aria-hidden', 'false');
+
+      const rareHit = rollRare(config);
+      appState.isRareHit = rareHit;
+      setOverlayRareMode(rareHit);
+
+      if (rareHit) {
+        setStatus(State.ROLLING);
+        renderOverlayLoading('レア演出発生...');
+        els.overlayMeta.textContent = `${config.label} のレア抽選中...`;
+
+        startRareIntro(() => {
+          startRoulette(actionKey, config, rareImages, true);
+        }, rareText);
+        return;
+      }
+
+      if (normalImages.length === 0) {
+        window.alert(`${config.label} の通常画像がありません。`);
+        closeOverlay();
+        return;
+      }
+
       renderOverlayLoading('抽選中...');
       els.overlayMeta.textContent = `${config.label} を表示しています`;
-
       setStatus(State.ROLLING);
-      startRoulette(actionKey, config, images);
+      startRoulette(actionKey, config, normalImages, false);
     }
 
     function applyResult() {
@@ -546,20 +761,25 @@
       if (!config || !result || appState.status !== State.RESULT) return;
 
       if (config.type === 'toolSlot') {
-        renderImageCard(els.toolSlot, result, config.label);
+        renderImageCard(els.toolSlot, result, appState.isRareHit ? `${config.label} ACE` : config.label);
       } else if (config.type === 'stadiumSlot') {
-        renderImageCard(els.stadiumSlot, result, config.label);
+        renderImageCard(els.stadiumSlot, result, appState.isRareHit ? `${config.label} ACE` : config.label);
       }
 
       closeOverlay();
     }
 
-    function startRoulette(actionKey, config, images) {
-      const sequence = [
-        60, 60, 70, 70,
-        80, 90, 100, 120,
-        150, 180, 220, 260, 320, 700, 320
-      ];
+    function startRoulette(actionKey, config, images, isRare = false) {
+      const sequence = isRare
+        ? [
+            60, 60, 70, 70, 80, 90, 100, 120, 150,
+            180, 220, 260, 320, 400, 500, 700, 900, 1200
+          ]
+        : [
+            60, 60, 70, 70,
+            80, 90, 100, 120,
+            150, 180, 220, 260, 320, 700, 320
+          ];
 
       let stepIndex = 0;
       let previewImage = null;
@@ -578,8 +798,12 @@
 
       const showNext = () => {
         previewImage = pickPreviewImage();
-        renderOverlayImage(previewImage, config.label);
-        els.overlayMeta.textContent = `${config.label} を表示しています...`;
+        renderOverlayImage(previewImage, isRare ? `${config.label} ACE` : config.label);
+        setOverlayRareMode(isRare);
+
+        els.overlayMeta.textContent = isRare
+          ? `${config.label} のACE抽選中...`
+          : `${config.label} を表示しています...`;
 
         if (stepIndex < sequence.length - 1) {
           const delay = sequence[stepIndex];
@@ -588,35 +812,45 @@
           return;
         }
 
-        // 停止前の“間”
-        els.overlayMeta.textContent = `${config.label} が止まります...`;
+        els.overlayMeta.textContent = isRare
+          ? `${config.label} ACE が止まります...`
+          : `${config.label} が止まります...`;
 
         window.setTimeout(() => {
           appState.currentResult = previewImage;
           decisionSound.currentTime = 0;
-          decisionSound.play();
-          els.overlayMeta.textContent = `${config.label} の結果`;
+          decisionSound.play().catch(() => {});
+
+          els.overlayMeta.textContent = isRare
+            ? `${config.label} ACE の結果`
+            : `${config.label} の結果`;
 
           const img = els.overlayCard.querySelector('.overlay-image');
           if (img) {
             img.animate(
-              [
-                { transform: 'scale(1)' },
-                { transform: 'scale(1.08)' },
-                { transform: 'scale(1)' }
-              ],
+              isRare
+                ? [
+                    { transform: 'scale(1)', filter: 'brightness(1)' },
+                    { transform: 'scale(1.12)', filter: 'brightness(1.35)' },
+                    { transform: 'scale(1)', filter: 'brightness(1)' }
+                  ]
+                : [
+                    { transform: 'scale(1)' },
+                    { transform: 'scale(1.08)' },
+                    { transform: 'scale(1)' }
+                  ],
               {
-                duration: 280,
+                duration: isRare ? 420 : 280,
                 easing: 'ease-out'
               }
             );
           }
 
           setStatus(State.RESULT);
-        }, 500);
+        }, isRare ? 700 : 500);
       };
 
-      window.setTimeout(showNext, 120);
+      window.setTimeout(showNext, isRare ? 180 : 120);
     }
 
     function closeOverlay() {
@@ -625,7 +859,9 @@
       appState.currentAction = null;
       appState.currentResult = null;
       appState.pendingTarget = null;
+      appState.isRareHit = false;
       els.overlayMeta.textContent = '';
+      setOverlayRareMode(false);
       setStatus(State.IDLE);
     }
 
